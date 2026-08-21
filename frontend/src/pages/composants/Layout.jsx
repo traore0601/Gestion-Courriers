@@ -13,7 +13,7 @@ function Layout({ children }) {
         <TopBar />
 
         {/* Zone de contenu réactive qui prend tout le reste de l'espace */}
-        <main className="flex-1 p-8  overflow-y-auto w-full h-full bg-white flex flex-col items-center mt-3 ml-3 rounded-2xl  ">
+        <main className="flex-1 px-8 py-2  overflow-y-auto w-full h-full bg-white flex flex-col items-center mt-3 ml-3 mb-3 rounded-2xl">
           {children}
         </main>
       </div>

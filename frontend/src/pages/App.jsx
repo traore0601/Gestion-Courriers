@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import Dash from './Dashbord.jsx';
+import Layout from './composants/Layout.jsx';
+import AppRoutes from './AppRoutes.jsx';
+
 
 function App() {
   const [message, setMessage] = useState('');
@@ -13,8 +15,12 @@ function App() {
 
   return (
     <div >
-      
-      <Dash/>
+
+      <Layout>
+      {/* AppRoutes affichera automatiquement la bonne page ici */}
+      <AppRoutes />
+    </Layout>
+
     </div>
   );
 }
