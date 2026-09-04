@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import avatarImg from "../assets/heroo.jpeg";
 import { useAuth } from "../context/AuthContext.jsx";
+import LogoutConfirmModal from "./LogoutConfirmModal.jsx";
 import { 
   LayoutDashboard, 
   Inbox, 
@@ -35,10 +36,18 @@ const BOTTOM_NAV_ITEMS = [
 const Sidebar = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login', { replace: true });
+  const handleConfirmLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } finally {
+      setLoggingOut(false);
+      setLogoutModalOpen(false);
+    }
   };
 
   const getLinkClass = ({ isActive }) =>
@@ -93,13 +102,20 @@ const Sidebar = () => {
         {/* Bouton de Déconnexion */}
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setLogoutModalOpen(true)}
           className="w-full flex items-center gap-3 px-3.5 py-2 rounded-full text-sm font-medium text-white hover:bg-red-600/80 focus-visible:bg-red-600/80 outline-none transition-colors cursor-pointer"
         >
           <LogOut className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span className="truncate">Déconnexion</span>
         </button>
       </div>
+
+      <LogoutConfirmModal
+        open={logoutModalOpen}
+        loading={loggingOut}
+        onConfirm={handleConfirmLogout}
+        onCancel={() => setLogoutModalOpen(false)}
+      />
     </aside>
   );
 };

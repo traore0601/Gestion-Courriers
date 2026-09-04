@@ -14,9 +14,9 @@ from courrier.models import Profil, Utilisateur
 
 
 ROLES = [
-    ("ADMIN", "Administration"),
-    ("DG", "Direction Générale"),
-    ("SECRETAIRE", "Secrétariat"),
+    ("ADMIN", "Administrateur"),
+    ("DG", "Directeur"),
+    ("SECRETAIRE", "Secrétaire"),
     ("SERVICE", "Service"),
 ]
 

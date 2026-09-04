@@ -169,6 +169,14 @@ class CourrierEntrant(models.Model):
         blank=True,
         verbose_name="Nature du courrier",
     )
+    mode_d_arrivee = models.CharField(
+            max_length=100,
+            
+            null=True,
+            blank=True,
+            
+        )
+    
     priorite = models.CharField(
         max_length=20, choices=Priorite.choices, default=Priorite.NORMALE
     )
@@ -281,7 +289,7 @@ class PieceJointe(models.Model):
    def __str__(self):
         return self.nom_original
 
-from django.db import models
+
 
 class Ampliateur(models.Model):
     date_envoi = models.DateTimeField(auto_now_add=True)

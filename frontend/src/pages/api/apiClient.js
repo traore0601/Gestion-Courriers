@@ -45,7 +45,7 @@ async function refreshAccessToken() {
 
   // Évite les rafraîchissements concurrents multiples
   if (!refreshingPromise) {
-    refreshingPromise = fetch(`${API_BASE_URL}/api/auth/refresh/`, {
+    refreshingPromise = fetch(`${API_BASE_URL}/api/token/refresh/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh }),
@@ -111,7 +111,7 @@ export async function authFetch(url, options = {}) {
  * Appelle le endpoint de connexion et enregistre la session en cas de succès.
  */
 export async function loginRequest(email, password) {
-  const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
+  const response = await fetch(`${API_BASE_URL}/api/token/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -140,7 +140,7 @@ export async function logoutRequest() {
   const refresh = getRefreshToken();
   try {
     if (refresh) {
-      await authFetch("/api/auth/logout/", {
+      await authFetch("/api/token/logout/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh }),
@@ -157,7 +157,7 @@ export async function logoutRequest() {
  * Récupère les informations de l'utilisateur actuellement connecté.
  */
 export async function fetchCurrentUser() {
-  const response = await authFetch("/api/auth/me/");
+  const response = await authFetch("/api/me/");
   if (!response.ok) {
     throw new Error("Impossible de récupérer l'utilisateur courant.");
   }
