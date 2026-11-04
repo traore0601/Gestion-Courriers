@@ -367,3 +367,130 @@ class Permission(models.Model):
    
    def __str__(self):
         return f"{self.profil.nom} -> {self.pagemenu.nom}"
+
+
+
+
+class Notification(models.Model):
+    """
+    Notification destinée à un Utilisateur (secrétaire, service, DG...).
+    Créée automatiquement quand :
+      - un courrier entrant est assigné à un personnel (destinataire principal)
+      - un personnel est ajouté comme ampliateur sur un courrier entrant
+    mais peut aussi être créée manuellement (relance de délai, etc.).
+    """
+
+    class Type(models.TextChoices):
+        WARNING = "WARNING", "Avertissement"   # ex: délai bientôt dépassé
+        DELAY = "DELAY", "Retard"               # ex: délai dépassé
+        INFO = "INFO", "Information"            # ex: nouveau courrier assigné
+        SUCCESS = "SUCCESS", "Succès"           # ex: transmission confirmée
+
+    destinataire = models.ForeignKey(
+        'Utilisateur',
+        on_delete=models.CASCADE,
+        related_name='notifications',
+    )
+
+    type_notification = models.CharField(
+        max_length=20, choices=Type.choices, default=Type.INFO
+    )
+    titre = models.CharField(max_length=255)
+    message = models.TextField(blank=True, default='')
+
+    # URL front-end vers laquelle rediriger au clic (ex: /boite-reception?courrier=12)
+    lien = models.CharField(max_length=255, blank=True, null=True)
+
+    is_read = models.BooleanField(default=False)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    # Références optionnelles vers l'objet concerné (pour contexte / lien)
+    courrier_entrant = models.ForeignKey(
+        'CourrierEntrant', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='notifications'
+    )
+    courrier_sortant = models.ForeignKey(
+        'CourrierSortant', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='notifications'
+    )
+
+    class Meta:
+        ordering = ['-date_creation']
+        verbose_name = "Notification"
+        verbose_name_plural = "Notifications"
+
+    def __str__(self):
+        return f"{self.titre} -> {self.destinataire}"
+
+
+class Archive(models.Model):
+
+    cote_archivage = models.CharField(
+        max_length=100, unique=True, verbose_name="Cote d'archivage"
+    )
+
+    # Liens facultatifs vers les courriers originaux
+    courrier_entrant = models.OneToOneField(
+        'CourrierEntrant',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='archive',
+    )
+    courrier_sortant = models.OneToOneField(
+        'CourrierSortant',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='archive',
+    )
+
+    # Pièce jointe optionnelle (numérisation)
+    fichier_joint = models.FileField(
+        upload_to='archives/',
+        null=True,
+        blank=True,
+        verbose_name="Pièce jointe / Document numérisé",
+        help_text="Fichier numérisé (PDF, Image). Optionnel si l'archive est uniquement physique."
+    )
+
+    # Métadonnées d'archivage
+    intitule_dossier = models.CharField(
+        max_length=255, verbose_name="Intitulé du dossier"
+    )
+    numero_dossier = models.CharField(
+        max_length=100, blank=True, default='', verbose_name="N° de dossier"
+    )
+    type_documentaire = models.CharField(
+        max_length=150, blank=True, default=''
+    )
+
+    # Localisation physique
+    emplacement_physique = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Ex: Salle 2 / Travée C / Boîte 12",
+    )
+    num_boite = models.CharField(max_length=100, blank=True, default='')
+
+    # Traçabilité & Agent verseur
+    agent = models.ForeignKey(
+        'Personnel', on_delete=models.SET_NULL, null=True, blank=True
+    )
+    societe = models.ForeignKey(
+        'Societe', on_delete=models.CASCADE, null=True, blank=True
+    )
+
+    class Meta:
+        ordering = ['-id']
+        verbose_name = "Archive"
+        verbose_name_plural = "Archives"
+
+    def __str__(self):
+        return f"{self.cote_archivage} - {self.intitule_dossier}"
+
+    @property
+    def est_numerise(self):
+        """Retourne True si un fichier numérisé est attaché à l'archive."""
+        return bool(self.fichier_joint)

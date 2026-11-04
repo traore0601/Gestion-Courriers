@@ -16,6 +16,8 @@ from courrier.views import (
     UtilisateurViewSet,
     PieceJointeViewSet,
     DocumentFinalViewSet,
+    NotificationViewSet,
+    DashboardViewSet  # <--- 1. Import du DashboardViewSet
 )
 
 # Création du routeur DRF
@@ -27,6 +29,8 @@ router.register(r"courriers-sortants", CourrierSortantViewSet, basename="courrie
 router.register(r"utilisateurs", UtilisateurViewSet, basename="utilisateur")
 router.register(r"pieces-jointes", PieceJointeViewSet, basename="piece-jointe")
 router.register(r"documents-finaux", DocumentFinalViewSet, basename="document-final")
+router.register(r"notifications", NotificationViewSet, basename="notification")
+router.register(r"dashboard", DashboardViewSet, basename="dashboard")  # <--- 2. Enregistrement de la route
 
 urlpatterns = [
     path("admin/", admin.site.urls),

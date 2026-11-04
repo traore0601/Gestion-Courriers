@@ -1,7 +1,8 @@
 // Client API centralisé pour communiquer avec le backend Django.
 // Gère automatiquement l'ajout du token JWT et le rafraîchissement
 // du token d'accès lorsque celui-ci a expiré.
-
+// À la fin de src/pages/api/apiClient.js
+export { deleteNotificationRequest as deleteNotificationApi };
 export const API_BASE_URL = "http://127.0.0.1:8000";
 
 const ACCESS_TOKEN_KEY = "access_token";
@@ -68,7 +69,7 @@ async function refreshAccessToken() {
 }
 
 /**
- * authFetch : équivalent de fetch() mais qui ajoute automatiquement
+ * authFetch : équivalent de fetch() mais ajoute automatiquement
  * l'en-tête Authorization et tente un rafraîchissement du token
  * en cas de réponse 401 (token expiré).
  */
@@ -107,6 +108,10 @@ export async function authFetch(url, options = {}) {
   return response;
 }
 
+/* ==========================================================================
+   AUTHENTIFICATION & UTILISATEURS
+   ========================================================================== */
+
 /**
  * Appelle le endpoint de connexion et enregistre la session en cas de succès.
  */
@@ -133,8 +138,7 @@ export async function loginRequest(email, password) {
 
 /**
  * Déconnecte l'utilisateur : blacklist le refresh token côté serveur
- * puis nettoie la session locale (le nettoyage local a toujours lieu,
- * même si l'appel réseau échoue).
+ * puis nettoie la session locale.
  */
 export async function logoutRequest() {
   const refresh = getRefreshToken();
@@ -147,7 +151,7 @@ export async function logoutRequest() {
       });
     }
   } catch {
-    // On ignore les erreurs réseau : la session locale est nettoyée quoi qu'il arrive.
+    // Ignore les erreurs réseau : nettoyage local systématique.
   } finally {
     clearSession();
   }
@@ -160,6 +164,111 @@ export async function fetchCurrentUser() {
   const response = await authFetch("/api/me/");
   if (!response.ok) {
     throw new Error("Impossible de récupérer l'utilisateur courant.");
+  }
+  return response.json();
+}
+
+/* ==========================================================================
+   NOTIFICATIONS
+   ========================================================================== */
+
+export async function fetchNotifications() {
+  const response = await authFetch("/api/notifications/");
+  if (!response.ok) {
+    throw new Error("Impossible de récupérer les notifications.");
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.results || [];
+}
+
+/**
+ * Récupère uniquement le nombre de notifications non lues.
+ */
+export async function fetchUnreadNotificationsCount() {
+  const response = await authFetch("/api/notifications/unread_count/");
+  if (!response.ok) {
+    throw new Error("Impossible de récupérer le compteur de notifications.");
+  }
+  const data = await response.json();
+  return data.unread_count;
+}
+
+/**
+ * Marque une notification précise comme lue.
+ */
+export async function markNotificationAsRead(id) {
+  const response = await authFetch(`/api/notifications/${id}/mark_read/`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Impossible de marquer la notification comme lue.");
+  }
+  return response.json();
+}
+
+/**
+ * Marque toutes les notifications de l'utilisateur comme lues.
+ */
+export async function markAllNotificationsAsRead() {
+  const response = await authFetch("/api/notifications/mark_all_read/", {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Impossible de marquer toutes les notifications comme lues.");
+  }
+  return response.json();
+}
+
+/**
+ * Supprime une notification.
+ */
+export async function deleteNotificationRequest(id) {
+  const response = await authFetch(`/api/notifications/${id}/`, {
+    method: "DELETE",
+  });
+  if (!response.ok && response.status !== 204) {
+    throw new Error("Impossible de supprimer la notification.");
+  }
+}
+
+/* ==========================================================================
+   TABLEAU DE BORD & COURRIERS
+   ========================================================================== */
+
+/**
+ * Récupère la liste des courriers destinés au service/destinataire.
+ */
+export async function fetchCourriersDestinataire() {
+  const response = await authFetch("/api/courriers/destinataire/");
+  if (!response.ok) {
+    throw new Error("Impossible de charger la liste des courriers.");
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : data.results || [];
+}
+
+/**
+ * Met à jour le statut d'un courrier (ex: "Pris en charge").
+ */
+export async function updateStatutCourrier(id, statut) {
+  const response = await authFetch(`/api/courriers/${id}/statut/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ statut }),
+  });
+  if (!response.ok) {
+    throw new Error("Impossible de modifier le statut du courrier.");
+  }
+  return response.json();
+}
+
+/**
+ * Récupère les statistiques dynamiques pour le tableau de bord du service/destinataire.
+ */
+export async function fetchDashboardStatsDestinataire() {
+  const response = await authFetch("/api/dashboard/destinataire/stats/");
+  if (!response.ok) {
+    throw new Error("Impossible de charger les statistiques du tableau de bord.");
   }
   return response.json();
 }

@@ -13,8 +13,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getStoredUser());
   const [loading, setLoading] = useState(true);
 
-  // Au montage : si un token existe déjà (session précédente), on vérifie
-  // sa validité auprès du backend et on récupère l'utilisateur à jour.
+  // Synchronise le state local React ET le localStorage avec les données les plus récentes
   useEffect(() => {
     let isMounted = true;
 
@@ -26,7 +25,11 @@ export function AuthProvider({ children }) {
       }
       try {
         const currentUser = await fetchCurrentUser();
-        if (isMounted) setUser(currentUser);
+        if (isMounted) {
+          setUser(currentUser);
+          // Met à jour la clé 'auth_user' dans le localStorage avec les infos fraîches du backend
+          localStorage.setItem("auth_user", JSON.stringify(currentUser));
+        }
       } catch {
         if (isMounted) setUser(null);
       } finally {

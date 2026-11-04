@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, RefreshCw, Plus, FileText, Paperclip, Eye, 
-  Trash2, Calendar, Filter, X, AlertCircle, Clock
+  Trash2, Calendar, Filter, X, AlertCircle, Clock, 
+  MoreVertical, Mail, Phone
 } from 'lucide-react';
 
 import { authFetch } from '../api/apiClient.js';
+
 const ORDRE_PERIODES = [
   "Aujourd'hui",
   "Hier",
@@ -22,7 +24,6 @@ const getCategorieTemporelle = (dateString) => {
   if (isNaN(dateEnregistrement.getTime())) return "Plus ancien";
 
   const maintenant = new Date();
-
   const aujourdhui = new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate());
   const cible = new Date(dateEnregistrement.getFullYear(), dateEnregistrement.getMonth(), dateEnregistrement.getDate());
 
@@ -45,6 +46,29 @@ const getCategorieTemporelle = (dateString) => {
   return "Plus ancien";
 };
 
+// Fonction pour formater en chiffres : JJ/MM/AAAA
+const formatNumDate = (dateString) => {
+  if (!dateString) return '--/--/----';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '--/--/----';
+  const jour = String(d.getDate()).padStart(2, '0');
+  const mois = String(d.getMonth() + 1).padStart(2, '0');
+  const annee = d.getFullYear();
+  return `${jour}/${mois}/${annee}`;
+};
+
+// Fonction utilitaire pour générer des couleurs par expéditeur
+const getAvatarBg = (name) => {
+  const colors = [
+    'bg-orange-500', 'bg-blue-600', 'bg-purple-600', 
+    'bg-teal-600', 'bg-pink-500', 'bg-emerald-500'
+  ];
+  if (!name) return colors[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+};
+
 function ListeCourriersEntrants() {
   const navigate = useNavigate();
 
@@ -59,6 +83,8 @@ function ListeCourriersEntrants() {
 
   const [selectedCourrier, setSelectedCourrier] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [activeMenuId, setActiveMenuId] = useState(null);
 
   const fetchCourriers = async () => {
     setLoading(true);
@@ -106,6 +132,24 @@ function ListeCourriersEntrants() {
       alert("Impossible de joindre le serveur.");
     } finally {
       setDeletingId(null);
+      setActiveMenuId(null);
+    }
+  };
+
+  const toggleSelectRow = (id) => {
+    setSelectedRows((prev) => 
+      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = (sectionItems) => {
+    const itemIds = sectionItems.map((item) => item.id);
+    const allSelected = itemIds.every((id) => selectedRows.includes(id));
+    
+    if (allSelected) {
+      setSelectedRows((prev) => prev.filter((id) => !itemIds.includes(id)));
+    } else {
+      setSelectedRows((prev) => Array.from(new Set([...prev, ...itemIds])));
     }
   };
 
@@ -156,28 +200,52 @@ function ListeCourriersEntrants() {
     setFiltreStatut('tous');
   };
 
+  const renderStatusBadge = (courrier) => {
+    if (courrier.droit_de_reponse) {
+      return (
+        <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold border border-purple-300 text-purple-600 bg-purple-50/50 truncate max-w-full">
+          Pending
+        </span>
+      );
+    }
+    if (courrier.confidentialite) {
+      return (
+        <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold border border-amber-300 text-amber-600 bg-amber-50/50 truncate max-w-full">
+          On-Hold
+        </span>
+      );
+    }
+    return (
+      <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold border border-emerald-300 text-emerald-600 bg-emerald-50/50 truncate max-w-full">
+        Candidate
+      </span>
+    );
+  };
+
   return (
-    <div className="w-full space-y-6 font-sans">
+    /* Correction : Remplacement de overflow-hidden par overflow-y-auto et adaptation de la hauteur */
+    <div className="w-full h-full max-h-screen overflow-y-auto space-y-6 font-sans text-gray-700 bg-gray-50/30 p-4 rounded-2xl">
+      {/* Header */}
       <div className="flex justify-between items-center border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Courriers Entrants</h1>
-          <p className="text-sm text-gray-500">
-            Filtrage et classement basés sur la date d'ajout ({courriersFiltres.length} sur {safeCourriers.length})
+          <h1 className="text-2xl font-bold text-gray-800">Courriers</h1>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Affichage de {courriersFiltres.length} sur {safeCourriers.length} données
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={fetchCourriers}
-            className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+            className="p-2 text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition shadow-sm cursor-pointer"
             title="Actualiser la liste"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
           <button 
-            onClick={() => navigate('/courriers-arrives')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5"
+            onClick={() => navigate("nouveau")}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Nouveau courrier entrant
@@ -185,38 +253,39 @@ function ListeCourriersEntrants() {
         </div>
       </div>
 
-      <div className="bg-white p-4 border border-gray-200 rounded-xl space-y-3 shadow-sm">
+      {/* Barre de Filtres */}
+      <div className="bg-white p-4 border border-gray-100 rounded-2xl space-y-3 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="N°, référence, objet, expéditeur..."
+              placeholder="Rechercher..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-gray-50/30"
             />
           </div>
 
-          <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-1.5 bg-gray-50/50">
+          <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-2.5 py-1.5 bg-gray-50/30">
             <span className="text-[10px] text-gray-400 font-medium shrink-0">Ajouté du :</span>
             <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
             <input
               type="date"
               value={dateDebut}
               onChange={(e) => setDateDebut(e.target.value)}
-              className="bg-transparent text-xs text-gray-700 w-full focus:outline-none"
+              className="bg-transparent text-xs text-gray-700 w-full focus:outline-none cursor-pointer"
             />
           </div>
 
-          <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-1.5 bg-gray-50/50">
+          <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-2.5 py-1.5 bg-gray-50/30">
             <span className="text-[10px] text-gray-400 font-medium shrink-0">Au :</span>
             <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
             <input
               type="date"
               value={dateFin}
               onChange={(e) => setDateFin(e.target.value)}
-              className="bg-transparent text-xs text-gray-700 w-full focus:outline-none"
+              className="bg-transparent text-xs text-gray-700 w-full focus:outline-none cursor-pointer"
             />
           </div>
 
@@ -225,11 +294,11 @@ function ListeCourriersEntrants() {
             <select
               value={filtreStatut}
               onChange={(e) => setFiltreStatut(e.target.value)}
-              className="w-full text-xs border border-gray-200 rounded-lg p-2 focus:outline-none bg-white"
+              className="w-full text-xs border border-gray-200 rounded-xl p-2 focus:outline-none bg-white text-gray-600 cursor-pointer"
             >
               <option value="tous">Tous les courriers</option>
-              <option value="urgent">Réponse requise</option>
-              <option value="confidentiel">Confidentiels uniquement</option>
+              <option value="urgent">Pending (Réponse requise)</option>
+              <option value="confidentiel">On-Hold (Confidentiel)</option>
             </select>
           </div>
         </div>
@@ -238,7 +307,7 @@ function ListeCourriersEntrants() {
           <div className="flex justify-end pt-1">
             <button
               onClick={resetFilters}
-              className="text-xs text-red-600 hover:underline flex items-center gap-1 font-medium"
+              className="text-xs text-red-500 hover:underline flex items-center gap-1 font-medium cursor-pointer"
             >
               <X className="w-3 h-3" /> Réinitialiser les filtres
             </button>
@@ -247,111 +316,192 @@ function ListeCourriersEntrants() {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 text-xs">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-3 text-red-700 text-xs">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <p>{error}. Vérifiez la connexion au backend Django.</p>
         </div>
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-gray-400 bg-white rounded-xl border border-gray-200">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-blue-600" />
+        <div className="p-12 text-center text-gray-400 bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-indigo-600" />
           <p className="text-xs">Chargement de la liste des courriers...</p>
         </div>
       ) : courriersTries.length === 0 ? (
-        <div className="p-12 text-center text-gray-500 bg-white rounded-xl border border-gray-200 space-y-2">
+        <div className="p-12 text-center text-gray-500 bg-white rounded-2xl border border-gray-100 shadow-sm space-y-2">
           <FileText className="w-10 h-10 mx-auto text-gray-300" />
           <p className="text-sm font-medium">Aucun courrier ne correspond à votre recherche</p>
           <p className="text-xs text-gray-400">
-            {searchTerm || dateDebut || dateFin ? "Essayez de modifier la plage de dates d'ajout." : "Cliquez sur + Nouveau courrier entrant pour en ajouter."}
+            {searchTerm || dateDebut || dateFin ? "Essayez de modifier la plage de dates." : "Cliquez sur + Nouveau courrier entrant pour en ajouter."}
           </p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-8">
           {ORDRE_PERIODES.map((periode) => {
             const listeSect = courriersGroupes[periode];
             if (!listeSect || listeSect.length === 0) return null;
 
+            const isAllSectionSelected = listeSect.every((item) => selectedRows.includes(item.id));
+
             return (
               <div key={periode} className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-600 bg-gray-100/80 px-3 py-1.5 rounded-lg w-fit border border-gray-200">
-                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 bg-gray-100/70 px-3 py-1.5 rounded-xl w-fit">
+                  <Clock className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Ajouté : {periode}</span>
-                  <span className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.2 rounded-full">
+                  <span className="bg-white text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold shadow-xs">
                     {listeSect.length}
                   </span>
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 font-semibold text-gray-500 uppercase text-[10px]">
-                          <th className="p-3">N° Ordre</th>
-                          <th className="p-3">Référence</th>
-                          <th className="p-3">Date d'ajout</th>
-                          <th className="p-3">Expéditeur</th>
-                          <th className="p-3">Objet</th>
-                          <th className="p-3">Pièces Jointes</th>
-                          <th className="p-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {listeSect.map((c, idx) => (
-                          <tr key={c.id || idx} className="hover:bg-blue-50/40 transition-colors">
-                            <td className="p-3 font-bold text-blue-600 whitespace-nowrap">#{c.numero_ordre || c.id || '-'}</td>
-                            <td className="p-3 font-semibold text-gray-800 whitespace-nowrap">{c.reference || '-'}</td>
-                            <td className="p-3 text-gray-600 font-medium whitespace-nowrap">
-                              {c.date_creation ? new Date(c.date_creation).toLocaleDateString('fr-FR') : '-'}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs table-fixed">
+                    <thead>
+                      <tr className="bg-gray-50/50 border-b border-gray-100 font-bold text-gray-400 uppercase text-[10px] tracking-wider">
+                        <th className="p-3 w-10 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isAllSectionSelected}
+                            onChange={() => toggleSelectAll(listeSect)}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          />
+                        </th>
+                        <th className="p-3 w-28">ID</th>
+                        <th className="p-3 w-28">Date Applied</th>
+                        <th className="p-3 w-1/4">Company</th>
+                        <th className="p-3 w-24">Type</th>
+                        <th className="p-3 w-1/4">Position</th>
+                        <th className="p-3 w-20 text-center">Contact</th>
+                        <th className="p-3 w-28 text-center">Status</th>
+                        <th className="p-3 w-10 text-right"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {listeSect.map((c, idx) => {
+                        const isSelected = selectedRows.includes(c.id);
+                        const expediteurNom = c.nom_expediteur || c.expediteur || 'Expéditeur inconnu';
+                        const initial = expediteurNom.charAt(0).toUpperCase();
+
+                        return (
+                          <tr 
+                            key={c.id || idx} 
+                            className={`hover:bg-gray-50/80 transition-colors ${isSelected ? 'bg-indigo-50/20' : ''}`}
+                          >
+                            {/* Case à cocher */}
+                            <td className="p-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelectRow(c.id)}
+                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              />
                             </td>
-                            <td className="p-3 text-gray-700 font-medium">{c.nom_expediteur || c.expediteur || '-'}</td>
-                            <td className="p-3 text-gray-800 max-w-xs truncate" title={c.objet || ''}>
-                              {c.objet || <span className="text-gray-400 italic">Sans objet</span>}
+
+                            {/* ID */}
+                            <td className="p-3 font-bold text-gray-800 truncate" title={`#APL-${(c.numero_ordre || c.id || 0).toString().padStart(4, '0')}`}>
+                              #APL-{(c.numero_ordre || c.id || 0).toString().padStart(4, '0')}
                             </td>
-                            
+
+                            {/* Date Applied (Chiffres uniquement JJ/MM/AAAA) */}
+                            <td className="p-3 text-gray-500 font-medium truncate">
+                              {formatNumDate(c.date_creation)}
+                            </td>
+
+                            {/* Company / Expéditeur */}
                             <td className="p-3">
-                              {c.pieces_jointes && Array.isArray(c.pieces_jointes) && c.pieces_jointes.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {c.pieces_jointes.map((pj, pIdx) => (
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0 ${getAvatarBg(expediteurNom)}`}>
+                                  {initial}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-bold text-gray-800 truncate" title={expediteurNom}>
+                                    {expediteurNom}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-normal truncate" title={c.structure_expediteur || 'Structure non renseignée'}>
+                                    {c.structure_expediteur || 'Structure non renseignée'}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Type / Référence */}
+                            <td className="p-3 font-extrabold text-gray-600 uppercase tracking-wider text-[10px] truncate" title={c.reference || 'FREELANCE'}>
+                              {c.reference || 'FREELANCE'}
+                            </td>
+
+                            {/* Position / Objet (Tronqué avec ...) */}
+                            <td className="p-3 text-gray-700 font-medium truncate" title={c.objet || ''}>
+                              {c.objet || 'Sans objet'}
+                            </td>
+
+                            {/* Contact / Pièces Jointes */}
+                            <td className="p-3 text-center">
+                              <div className="flex items-center justify-center gap-1 text-gray-600">
+                                {c.pieces_jointes && Array.isArray(c.pieces_jointes) && c.pieces_jointes.length > 0 ? (
+                                  c.pieces_jointes.map((pj, pIdx) => (
                                     <a
                                       key={pj.id || pIdx}
                                       href={pj.url_complete || pj.repertoire_pj || '#'}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[10px] px-2 py-0.5 rounded font-semibold hover:bg-blue-100 transition-colors"
+                                      className="p-1 hover:bg-indigo-50 text-indigo-600 rounded-lg transition-colors"
+                                      title={pj.nom_original || 'Pièce jointe'}
                                     >
-                                      <Paperclip className="w-3 h-3" /> {pj.nom_original || 'Fichier'}
+                                      <Paperclip className="w-3.5 h-3.5" />
                                     </a>
-                                  ))}
+                                  ))
+                                ) : (
+                                  <>
+                                    <button className="p-1 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors cursor-pointer" title="Contacter">
+                                      <Phone className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button className="p-1 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors cursor-pointer" title="Message">
+                                      <Mail className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Statut Style Bouton */}
+                            <td className="p-3 text-center">
+                              {renderStatusBadge(c)}
+                            </td>
+
+                            {/* Bouton 3 Points Action */}
+                            <td className="p-3 text-right relative">
+                              <button
+                                onClick={() => setActiveMenuId(activeMenuId === c.id ? null : c.id)}
+                                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+
+                              {/* Dropdown Menu */}
+                              {activeMenuId === c.id && (
+                                <div className="absolute right-2 top-9 w-32 bg-white border border-gray-100 rounded-xl shadow-lg z-20 py-1 text-left">
+                                  <button
+                                    onClick={() => { setSelectedCourrier(c); setActiveMenuId(null); }}
+                                    className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                                    Détails
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(c.id)}
+                                    disabled={deletingId === c.id}
+                                    className="w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    Supprimer
+                                  </button>
                                 </div>
-                              ) : (
-                                <span className="text-gray-400 italic">Aucune</span>
                               )}
                             </td>
-
-                            <td className="p-3 text-right whitespace-nowrap space-x-1">
-                              <button
-                                onClick={() => setSelectedCourrier(c)}
-                                className="p-1.5 text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 rounded border transition-colors"
-                                title="Détails"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => handleDelete(c.id)}
-                                disabled={deletingId === c.id}
-                                className="p-1.5 text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded border border-red-200 transition-colors disabled:opacity-50"
-                                title="Supprimer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             );
@@ -359,21 +509,22 @@ function ListeCourriersEntrants() {
         </div>
       )}
 
+      {/* Modal Détails */}
       {selectedCourrier && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start border-b pb-3">
               <div>
-                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                  N° Ordre #{selectedCourrier.numero_ordre || selectedCourrier.id || '-'}
+                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">
+                  #APL-{(selectedCourrier.numero_ordre || selectedCourrier.id || 0).toString().padStart(4, '0')}
                 </span>
-                <h2 className="text-lg font-bold text-gray-800 mt-1">
+                <h2 className="text-lg font-bold text-gray-800 mt-2">
                   Référence : {selectedCourrier.reference || 'Aucune'}
                 </h2>
               </div>
               <button
                 onClick={() => setSelectedCourrier(null)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -382,24 +533,24 @@ function ListeCourriersEntrants() {
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div>
                 <p className="text-gray-400 font-medium">Date du courrier (document)</p>
-                <p className="font-semibold text-gray-800">{selectedCourrier.date || 'Non renseignée'}</p>
+                <p className="font-semibold text-gray-800">{formatNumDate(selectedCourrier.date)}</p>
               </div>
               <div>
                 <p className="text-gray-400 font-medium">Date d'ajout système</p>
-                <p className="font-semibold text-blue-600">
-                  {selectedCourrier.date_creation ? new Date(selectedCourrier.date_creation).toLocaleString('fr-FR') : 'Non renseignée'}
+                <p className="font-semibold text-indigo-600">
+                  {formatNumDate(selectedCourrier.date_creation)}
                 </p>
               </div>
               <div>
-                <p className="text-gray-400 font-medium">Expéditeur</p>
+                <p className="text-gray-400 font-medium">Expéditeur / Company</p>
                 <p className="font-semibold text-gray-800">{selectedCourrier.nom_expediteur || selectedCourrier.expediteur || 'Non renseigné'}</p>
               </div>
               <div>
                 <p className="text-gray-400 font-medium">Structure</p>
                 <p className="font-semibold text-gray-800">{selectedCourrier.structure_expediteur || 'Non renseignée'}</p>
               </div>
-              <div className="col-span-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <p className="text-gray-400 font-medium mb-1">Objet du courrier</p>
+              <div className="col-span-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                <p className="text-gray-400 font-medium mb-1">Objet / Position</p>
                 <p className="text-gray-800 font-medium leading-relaxed">{selectedCourrier.objet || 'Aucun'}</p>
               </div>
             </div>
@@ -414,13 +565,13 @@ function ListeCourriersEntrants() {
                       href={pj.url_complete || pj.repertoire_pj || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between p-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs text-blue-700 font-semibold transition-colors"
+                      className="flex items-center justify-between p-2.5 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-700 font-semibold transition-colors"
                     >
                       <span className="flex items-center gap-2">
                         <Paperclip className="w-4 h-4" />
                         {pj.nom_original || 'Document joint'}
                       </span>
-                      <span className="text-[10px] text-blue-600 font-normal">Ouvrir / Télécharger ↗</span>
+                      <span className="text-[10px] text-indigo-600 font-normal">Ouvrir / Télécharger ↗</span>
                     </a>
                   ))}
                 </div>
@@ -432,7 +583,7 @@ function ListeCourriersEntrants() {
             <div className="flex justify-end pt-2 border-t">
               <button
                 onClick={() => setSelectedCourrier(null)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg transition-colors"
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
               >
                 Fermer
               </button>

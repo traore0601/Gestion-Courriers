@@ -1,21 +1,32 @@
 import React from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
+import FormulaireSortant from "./courriers/FormulaireSortant.jsx";
+import ListeCourriersSortants from "./courriers/ListeCourriersSortants.jsx";
 
 function CourriersDeparts() {
+  const navigate = useNavigate();
+
   return (
     <div className="w-full space-y-4">
-      <div className="flex justify-between items-center border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Courriers Départs</h1>
-          <p className="text-sm text-gray-500">Enregistrement des courriers expédiés.</p>
-        </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-          + Nouveau courrier départ
-        </button>
-      </div>
-
-      <div className="bg-white p-8 border border-dashed border-gray-300 rounded-xl text-center text-gray-500">
-        Formulaire et tableau des courriers sortants.
-      </div>
+      <Routes>
+        <Route 
+          path="" 
+          element={
+            <ListeCourriersSortants 
+              onNewClick={() => navigate("nouveau")} 
+            />
+          } 
+        />
+        <Route 
+          path="nouveau" 
+          element={
+            <FormulaireSortant 
+              onCancel={() => navigate("..")} 
+              onSuccess={() => navigate("..")} 
+            />
+          } 
+        />
+      </Routes>
     </div>
   );
 }

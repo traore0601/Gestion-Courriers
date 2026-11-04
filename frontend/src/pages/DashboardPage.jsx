@@ -27,8 +27,8 @@ import {
   CartesianGrid
 } from 'recharts';
 
-// Composant Custom Tooltip pour Recharts
 import { authFetch } from './api/apiClient.js';
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
@@ -77,7 +77,6 @@ function Dashboard() {
 
   const totalEntrants = courriersEntrants.length;
 
-  // Traitement par mois
   const moisNoms = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
   const countsParMois = Array(12).fill(0);
 
@@ -157,9 +156,9 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Courriers Entrants */}
+        {/* 2ème carte : Courriers Entrants */}
         <div 
-          onClick={() => navigate('/liste-courrier-entrant')}
+          onClick={() => navigate('/courriers-entrant')}
           className="bg-gradient-to-br from-blue-600 to-blue-700 p-5 rounded-2xl shadow-md text-white flex flex-col justify-between cursor-pointer hover:scale-[1.01] transition duration-200 group"
         >
           <div className="flex items-center justify-between">
@@ -176,7 +175,7 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Courriers Sortants */}
+        {/* 3ème carte : Courriers Sortants */}
         <div 
           onClick={() => navigate('/courriers-departs')}
           className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition duration-200 flex flex-col justify-between cursor-pointer group"
@@ -193,9 +192,9 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Courriers Internes */}
+        {/* 4ème carte : Courriers Internes */}
         <div 
-          onClick={() => navigate('/liste-courriers-internes')}
+          onClick={() => navigate('/courriers-internes')}
           className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition duration-200 flex flex-col justify-between cursor-pointer group"
         >
           <div className="flex items-center justify-between">
@@ -321,8 +320,8 @@ function Dashboard() {
                 <p className="text-xs text-slate-400">Récemment enregistrés dans le système</p>
               </div>
               <button 
-                onClick={() => navigate('/liste-courrier-entrant')}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition"
+                onClick={() => navigate('/courriers-entrant')}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition cursor-pointer"
               >
                 <span>Tout afficher</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -383,8 +382,8 @@ function Dashboard() {
                           </td>
                           <td className="py-3 px-2 text-right whitespace-nowrap">
                             <button 
-                              onClick={() => navigate(`/courriers-arrives/${item.id}`)}
-                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              onClick={() => navigate(`/courriers-entrant`)}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
                               title="Consulter"
                             >
                               <Eye className="w-4 h-4" />

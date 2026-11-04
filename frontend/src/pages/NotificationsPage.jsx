@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
-import { 
-  Bell, 
-  AlertTriangle, 
-  Clock, 
-  CheckCircle2, 
-  Info, 
-  Check, 
-  Trash2, 
-  Inbox 
+import React from 'react';
+import {
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  Info,
+  Check,
+  Trash2,
+  Inbox
 } from 'lucide-react';
+import { useNotifications } from './context/NotificationContext.jsx';
 
-// Configuration des styles et icônes selon le type d'alerte
+// Configuration des styles et icônes selon le type de notification (valeurs renvoyées par l'API)
 const NOTIFICATION_TYPES = {
   WARNING: {
     icon: AlertTriangle,
@@ -50,51 +50,15 @@ const NOTIFICATION_TYPES = {
   }
 };
 
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 1,
-    type: 'WARNING',
-    title: 'Délai de réponse bientôt dépassé',
-    message: 'Le courrier "Rapport d\'activité" requiert une réponse avant demain.',
-    time: "Il y a 30 min",
-    isRead: false
-  },
-  {
-    id: 2,
-    type: 'DELAY',
-    title: 'Courrier en souffrance',
-    message: 'Le courrier N° 2026-089 à destination de la comptabilité accuse un retard de 48h.',
-    time: 'Hier, 14:20',
-    isRead: false
-  },
-  {
-    id: 3,
-    type: 'SUCCESS',
-    title: 'Transmission confirmée',
-    message: 'Le bordereau de transmission N° FT-104 a été validé avec succès par le destinataire.',
-    time: '17/08/2026',
-    isRead: true
-  }
-];
-
 function Notifications() {
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-
-  const markAsRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
-  };
-
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-  };
-
-  const deleteNotification = (id) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification
+  } = useNotifications();
 
   return (
     <div className="w-full space-y-5">
@@ -121,7 +85,11 @@ function Notifications() {
       </div>
 
       {/* Liste des notifications */}
-      {notifications.length === 0 ? (
+      {loading && notifications.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+          <p className="text-xs">Chargement des notifications…</p>
+        </div>
+      ) : notifications.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 space-y-2">
           <Inbox className="w-8 h-8 mx-auto text-gray-300" />
           <p className="text-xs">Aucune notification pour le moment.</p>
@@ -129,41 +97,41 @@ function Notifications() {
       ) : (
         <div className="space-y-3">
           {notifications.map((item) => {
-            const config = NOTIFICATION_TYPES[item.type] || NOTIFICATION_TYPES.INFO;
+            const config = NOTIFICATION_TYPES[item.type_notification] || NOTIFICATION_TYPES.INFO;
             const Icon = config.icon;
 
             return (
               <div
                 key={item.id}
                 className={`border-l-4 ${config.borderColor} p-4 rounded-r-xl transition-all flex items-start justify-between gap-3 ${
-                  item.isRead ? 'bg-gray-50/70 border-gray-300 opacity-75' : `${config.bgColor} shadow-sm`
+                  item.is_read ? 'bg-gray-50/70 border-gray-300 opacity-75' : `${config.bgColor} shadow-sm`
                 }`}
               >
                 <div className="flex items-start space-x-3 min-w-0">
-                  <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${item.isRead ? 'text-gray-400' : config.iconColor}`} />
+                  <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${item.is_read ? 'text-gray-400' : config.iconColor}`} />
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`text-sm font-semibold ${item.isRead ? 'text-gray-700' : config.titleColor}`}>
-                        {item.title}
+                      <p className={`text-sm font-semibold ${item.is_read ? 'text-gray-700' : config.titleColor}`}>
+                        {item.titre}
                       </p>
-                      {!item.isRead && (
+                      {!item.is_read && (
                         <span className={`text-[10px] px-2 py-0.2 rounded font-medium bg-white/80 border border-gray-200 ${config.textColor}`}>
                           {config.badge}
                         </span>
                       )}
                     </div>
-                    <p className={`text-xs leading-relaxed ${item.isRead ? 'text-gray-500' : config.textColor}`}>
+                    <p className={`text-xs leading-relaxed ${item.is_read ? 'text-gray-500' : config.textColor}`}>
                       {item.message}
                     </p>
                     <span className="text-[10px] text-gray-400 block font-medium">
-                      {item.time}
+                      {item.time_ago}
                     </span>
                   </div>
                 </div>
 
                 {/* Actions individuelles */}
                 <div className="flex items-center gap-1 shrink-0">
-                  {!item.isRead && (
+                  {!item.is_read && (
                     <button
                       onClick={() => markAsRead(item.id)}
                       title="Marquer comme lu"

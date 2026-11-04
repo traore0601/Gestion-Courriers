@@ -1,19 +1,30 @@
-import { useState } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import FormulaireEntrant from "./courriers/FormulaireEntrant.jsx";
-import FormulaireSortant from "./courriers/FormulaireSortant.jsx";
+import ListeCourriersEntrants from "./courriers/ListeCourriersEntrants.jsx";
 
 function CourriersEntrant() {
-  return (
-    <div className="w-full space-y-2">
-      {/* En-tête compact */}
-      <div>
-        <h1 className="text-lg font-bold text-gray-800">Gestion des Courriers Arrivés</h1>
-        <p className="text-xs text-gray-500">Saisissez les informations des courriers entrants reçus par la structure.</p>
-      </div>
+  const navigate = useNavigate();
 
-      {/* Formulaire d'enregistrement */}
-      <FormulaireEntrant />
-    </div>
+  return (
+    <Routes>
+      <Route 
+        path="" 
+        element={
+          <ListeCourriersEntrants
+            onNewClick={() => navigate("nouveau")} 
+          />
+        } 
+      />
+      <Route 
+        path="nouveau" 
+        element={
+          <FormulaireEntrant
+            onCancel={() => navigate("..")} 
+            onSuccess={() => navigate("..")} 
+          />
+        } 
+      />
+    </Routes>
   );
 }
 

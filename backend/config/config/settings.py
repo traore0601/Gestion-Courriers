@@ -103,7 +103,7 @@ DATABASES   =   {
 'ENGINE':   'django.db.backends.postgresql',
 'NAME': 'db_courrier',
 'USER': 'django_user',
-'PASSWORD': 'awa2026',
+'PASSWORD': 'Canada2021',
 'HOST': 'localhost',
 'PORT': '5432',
 'DISABLE_SERVER_SIDE_CURSORS': True,

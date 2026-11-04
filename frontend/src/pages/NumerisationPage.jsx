@@ -1,96 +1,45 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   UploadCloud, 
-  FileText, 
-  Download, 
-  CheckCircle, 
   FileCheck, 
   X, 
   Loader2, 
-  Image as ImageIcon,
-  HardDrive
+  Archive,
+  MapPin,
+  User,
+  Building2,
+  Inbox,
+  Send,
+  Save,
+  Folder
 } from 'lucide-react';
 
-// Fonction de formatage d'URL sécurisée
 import { authFetch } from './api/apiClient.js';
-const getFullMediaUrl = (item) => {
-  if (!item) return '';
-  if (item.url_complete) return item.url_complete;
 
-  let path = item.repertoire_pj || '';
-  if (!path) return '';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+export default function UnifiedArchiveForm({ personnels, societes, courriersEntrants, courriersSortants, onSuccess }) {
+  const [formData, setFormData] = useState({
+    cote_archivage: '',
+    intitule_dossier: '',
+    numero_dossier: '',
+    type_documentaire: '',
+    emplacement_physique: '',
+    num_boite: '',
+    agent: '',
+    societe: '',
+    courrier_entrant: '',
+    courrier_sortant: ''
+  });
 
-  path = path.startsWith('/') ? path : `/${path}`;
-  if (!path.startsWith('/media/')) path = `/media${path}`;
-
-  return `http://127.0.0.1:8000${path}`;
-};
-
-// Fonction de téléchargement via Blob
-const handleDownload = async (item) => {
-  const fullUrl = getFullMediaUrl(item);
-  if (!fullUrl) return;
-
-  const nomOriginal = item.nom_original || 'fichier';
-
-  try {
-    const response = await authFetch(fullUrl);
-    if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
-    
-    const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.setAttribute('download', nomOriginal);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    
-    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
-  } catch (error) {
-    console.error('Erreur lors du téléchargement :', error);
-    window.open(fullUrl, '_blank');
-  }
-};
-
-export default function NumerisationPage() {
-  const [piecesJointes, setPiecesJointes] = useState([]);
   const [numeroPj, setNumeroPj] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-
   const fileInputRef = useRef(null);
 
-  const fetchPiecesJointes = () => {
-    authFetch('http://127.0.0.1:8000/api/pieces-jointes/')
-      .then((res) => res.json())
-      .then((data) => setPiecesJointes(Array.isArray(data) ? data : data.results || []))
-      .catch((err) => console.error('Erreur BDD :', err));
-  };
-
-  useEffect(() => {
-    fetchPiecesJointes();
-  }, []);
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0]);
-    }
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleFileChange = (e) => {
@@ -99,72 +48,263 @@ export default function NumerisationPage() {
     }
   };
 
-  const removeSelectedFile = () => {
-    setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleUpload = async (e) => {
+  // Soumission unique : Création Archive -> Récupération de l'ID -> Upload de la PJ liée
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedFile) return alert('Veuillez sélectionner un fichier.');
+    if (!selectedFile) return alert('Veuillez sélectionner un fichier numérisé à joindre.');
 
     setLoading(true);
-    const formData = new FormData();
-
-    if (numeroPj) formData.append('numero_pj', numeroPj);
-    formData.append('repertoire_pj', selectedFile);
-    formData.append('nom_original', selectedFile.name);
-    formData.append('taille', selectedFile.size);
-    formData.append('type_mime', selectedFile.type || 'application/octet-stream');
 
     try {
-      const response = await authFetch('http://127.0.0.1:8000/api/pieces-jointes/', {
-        method: 'POST',
-        body: formData,
+      // Step 1: Enregistrement de l'Archive
+      const archivePayload = { ...formData };
+      ['agent', 'societe', 'courrier_entrant', 'courrier_sortant'].forEach((key) => {
+        if (!archivePayload[key]) archivePayload[key] = null;
       });
 
-      if (response.ok) {
-        setNumeroPj('');
-        removeSelectedFile();
-        fetchPiecesJointes();
-      } else {
-        alert("Erreur lors de l'enregistrement de la pièce jointe.");
+      const resArchive = await authFetch(`${API_BASE_URL}/api/archives/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(archivePayload)
+      });
+
+      if (!resArchive.ok) {
+        const err = await resArchive.json();
+        throw new Error(`Erreur création dossier: ${JSON.stringify(err)}`);
       }
+
+      const createdArchive = await resArchive.json();
+
+      // Step 2: Enregistrement de la Pièce Jointe liée à l'Archive créée
+      const pjFormData = new FormData();
+      pjFormData.append('archive', createdArchive.id); // Clé étrangère liée
+      if (numeroPj) pjFormData.append('numero_pj', numeroPj);
+      pjFormData.append('repertoire_pj', selectedFile);
+      pjFormData.append('nom_original', selectedFile.name);
+      pjFormData.append('taille', selectedFile.size);
+      pjFormData.append('type_mime', selectedFile.type || 'application/octet-stream');
+
+      const resPj = await authFetch(`${API_BASE_URL}/api/pieces-jointes/`, {
+        method: 'POST',
+        body: pjFormData
+      });
+
+      if (!resPj.ok) {
+        throw new Error("Dossier créé mais échec de la liaison avec la pièce jointe.");
+      }
+
+      alert("Le dossier d'archive et son document numérisé ont été enregistrés et liés avec succès !");
+      
+      // Réinitialisation du formulaire
+      setFormData({
+        cote_archivage: '',
+        intitule_dossier: '',
+        numero_dossier: '',
+        type_documentaire: '',
+        emplacement_physique: '',
+        num_boite: '',
+        agent: '',
+        societe: '',
+        courrier_entrant: '',
+        courrier_sortant: ''
+      });
+      setNumeroPj('');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      if (onSuccess) onSuccess();
+
     } catch (error) {
-      console.error('Erreur Upload :', error);
+      console.error(error);
+      alert(error.message || "Une erreur est survenue lors de l'enregistrement.");
     } finally {
       setLoading(false);
     }
   };
 
-  const formatFileSize = (bytes) => {
-    if (!bytes) return '';
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1048576).toFixed(1) + ' MB';
-  };
-
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-8 p-6 text-slate-800">
+    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
       
-      {/* En-tête de section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Numérisation & Documents</h1>
-          <p className="text-xs text-slate-500 mt-1">Gérez, téléversez et archivez vos pièces jointes numérisées.</p>
+      {/* SECTION 1: Informations du Dossier d'Archive */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+          <Archive className="w-4 h-4 text-blue-600" />
+          <h2 className="text-sm font-bold text-slate-800">1. Informations du dossier d'archive</h2>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium">
-          <HardDrive className="w-4 h-4 text-slate-500" />
-          <span>{piecesJointes.length} document{piecesJointes.length > 1 ? 's' : ''} enregistré{piecesJointes.length > 1 ? 's' : ''}</span>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Cote d'archivage <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="cote_archivage"
+              required
+              value={formData.cote_archivage}
+              onChange={handleChange}
+              placeholder="Ex: ARC-2026-001"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Intitulé du dossier <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="intitule_dossier"
+              required
+              value={formData.intitule_dossier}
+              onChange={handleChange}
+              placeholder="Ex: Contrats Fournisseurs"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+              <Folder className="w-3.5 h-3.5 text-slate-400" /> N° de dossier
+            </label>
+            <input
+              type="text"
+              name="numero_dossier"
+              value={formData.numero_dossier}
+              onChange={handleChange}
+              placeholder="Ex: DOS-2026-X"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Type documentaire
+            </label>
+            <input
+              type="text"
+              name="type_documentaire"
+              value={formData.type_documentaire}
+              onChange={handleChange}
+              placeholder="Ex: Facture, PV..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" /> Emplacement physique
+            </label>
+            <input
+              type="text"
+              name="emplacement_physique"
+              value={formData.emplacement_physique}
+              onChange={handleChange}
+              placeholder="Ex: Salle 2 / Travée C / Boîte 12"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Numéro de Boîte
+            </label>
+            <input
+              type="text"
+              name="num_boite"
+              value={formData.num_boite}
+              onChange={handleChange}
+              placeholder="Ex: BOITE-12"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+              <User className="w-3.5 h-3.5 text-slate-400" /> Agent responsable
+            </label>
+            <select
+              name="agent"
+              value={formData.agent}
+              onChange={handleChange}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            >
+              <option value="">-- Sélectionner --</option>
+              {personnels?.map((p) => (
+                <option key={p.id} value={p.id}>{p.nom} {p.prenom}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" /> Société
+            </label>
+            <select
+              name="societe"
+              value={formData.societe}
+              onChange={handleChange}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            >
+              <option value="">-- Sélectionner --</option>
+              {societes?.map((s) => (
+                <option key={s.id} value={s.id}>{s.nom || s.raison_sociale}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+              <Inbox className="w-3.5 h-3.5 text-slate-400" /> Courrier Entrant
+            </label>
+            <select
+              name="courrier_entrant"
+              value={formData.courrier_entrant}
+              onChange={handleChange}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            >
+              <option value="">-- Aucun --</option>
+              {courriersEntrants?.map((ce) => (
+                <option key={ce.id} value={ce.id}>{ce.numero_enregistrement} - {ce.objet}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+              <Send className="w-3.5 h-3.5 text-slate-400" /> Courrier Sortant
+            </label>
+            <select
+              name="courrier_sortant"
+              value={formData.courrier_sortant}
+              onChange={handleChange}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
+            >
+              <option value="">-- Aucun --</option>
+              {courriersSortants?.map((cs) => (
+                <option key={cs.id} value={cs.id}>{cs.numero_enregistrement} - {cs.objet}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Zone de formulaire principal */}
-      <form onSubmit={handleUpload} className="space-y-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        
-        {/* Champ Numéro PJ */}
-        <div className="max-w-xs">
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+      {/* SECTION 2: Pièce Jointe & Numérisation */}
+      <div className="space-y-4 pt-4 border-t border-slate-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <UploadCloud className="w-4 h-4 text-blue-600" />
+            <h2 className="text-sm font-bold text-slate-800">2. Document scanné rattaché</h2>
+          </div>
+          <span className="text-[11px] text-rose-500 font-medium">* Fichier obligatoire</span>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">
             Numéro de Pièce Jointe <span className="text-slate-400 font-normal">(Optionnel)</span>
           </label>
           <input
@@ -172,21 +312,12 @@ export default function NumerisationPage() {
             value={numeroPj}
             onChange={(e) => setNumeroPj(e.target.value)}
             placeholder="Ex: PJ-2026-001"
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:bg-white focus:border-blue-600 focus:outline-none"
           />
         </div>
 
-        {/* Zone Dropzone */}
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 flex flex-col items-center justify-center ${
-            isDragging 
-              ? 'border-blue-500 bg-blue-50/60 scale-[0.99]' 
-              : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300'
-          }`}
-        >
+        {/* Zone de fichier */}
+        <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center bg-slate-50/50 hover:bg-slate-50 transition">
           <input
             type="file"
             ref={fileInputRef}
@@ -194,146 +325,47 @@ export default function NumerisationPage() {
             accept=".pdf,.png,.jpg,.jpeg"
             className="hidden"
           />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current.click()}
+            className="text-xs font-bold text-blue-600 hover:underline"
+          >
+            Sélectionner le document scanné
+          </button>
+          <p className="text-[11px] text-slate-400 mt-1">Formats acceptés : PDF, PNG, JPG</p>
 
-          <div className="w-12 h-12 mb-3 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
-            <UploadCloud className="w-6 h-6" />
-          </div>
-
-          <p className="text-slate-900 font-semibold text-sm mb-1">
-            Glissez vos fichiers scannés ici ou <button type="button" onClick={() => fileInputRef.current.click()} className="text-blue-600 hover:underline focus:outline-none font-bold">parcourez</button>
-          </p>
-          <p className="text-slate-400 text-xs">
-            PDF, PNG ou JPG (Taille max: 10 Mo)
-          </p>
-
-          {/* Fichier sélectionné */}
           {selectedFile && (
-            <div className="mt-5 w-full max-w-md bg-white border border-slate-200 rounded-xl p-3 shadow-xs flex items-center justify-between animate-in fade-in zoom-in-95 duration-150">
-              <div className="flex items-center space-x-3 overflow-hidden">
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                  <FileCheck className="w-5 h-5" />
-                </div>
-                <div className="text-left truncate">
-                  <p className="text-xs font-semibold text-slate-800 truncate">{selectedFile.name}</p>
-                  <p className="text-[10px] text-slate-400">{formatFileSize(selectedFile.size)}</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={removeSelectedFile}
-                className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
-                title="Supprimer la sélection"
-              >
-                <X className="w-4 h-4" />
+            <div className="mt-3 inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs text-xs font-semibold text-slate-700">
+              <FileCheck className="w-4 h-4 text-blue-600" />
+              <span>{selectedFile.name}</span>
+              <button type="button" onClick={() => setSelectedFile(null)} className="text-slate-400 hover:text-rose-500">
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
         </div>
-
-        {/* Bouton Enregistrer */}
-        {selectedFile && (
-          <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl font-medium text-xs shadow-sm transition disabled:opacity-50 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Envoi en cours...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Enregistrer le document</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
-      </form>
-
-      {/* Galerie des Pièces Jointes */}
-      <div className="space-y-4">
-        <h2 className="text-sm font-bold tracking-wide uppercase text-slate-500">
-          Documents archivés
-        </h2>
-
-        {piecesJointes.length === 0 ? (
-          <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-200 text-center space-y-2">
-            <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-2">
-              <FileText className="w-6 h-6" />
-            </div>
-            <p className="text-sm font-semibold text-slate-700">Aucune pièce jointe enregistrée</p>
-            <p className="text-xs text-slate-400">Téléversez vos premiers documents via la zone ci-dessus.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-            {piecesJointes.map((item, index) => {
-              const displayUrl = getFullMediaUrl(item);
-              const isImage = item.type_mime?.startsWith('image/') || item.nom_original?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-
-              return (
-                <div 
-                  key={item.id || index} 
-                  className="group bg-white rounded-2xl border border-slate-200 p-3.5 shadow-xs hover:shadow-md hover:border-slate-300 transition-all duration-200 flex flex-col justify-between"
-                >
-                  <div>
-                    {/* Badge / N° PJ */}
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[11px] font-bold text-blue-700 bg-blue-50/80 border border-blue-100 px-2.5 py-1 rounded-lg">
-                        {item.numero_pj ? `N° ${item.numero_pj}` : 'Sans numéro'}
-                      </span>
-                      {item.taille && (
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          {formatFileSize(item.taille)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Zone d'aperçu */}
-                    <div className="relative h-36 bg-slate-50 rounded-xl overflow-hidden flex items-center justify-center border border-slate-100 mb-3 group-hover:bg-slate-100/60 transition">
-                      {isImage ? (
-                        <img 
-                          src={displayUrl} 
-                          alt={item.nom_original} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center p-3 text-center space-y-1">
-                          <div className="p-3 bg-white text-slate-500 rounded-xl shadow-xs border border-slate-100">
-                            <FileText className="w-8 h-8 text-blue-600" />
-                          </div>
-                          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                            Document PDF / SCAN
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Nom du fichier */}
-                    <p className="text-xs font-semibold text-slate-700 truncate mb-4 px-0.5" title={item.nom_original}>
-                      {item.nom_original || 'Document sans titre'}
-                    </p>
-                  </div>
-
-                  {/* Action Télécharger */}
-                  <button
-                    type="button"
-                    onClick={() => handleDownload(item)}
-                    className="w-full py-2 px-3 bg-slate-900 hover:bg-blue-600 text-white font-medium text-xs rounded-xl transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Télécharger</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
-    </div>
+      {/* Bouton de Validation */}
+      <div className="flex justify-end pt-3 border-t border-slate-100">
+        <button
+          type="submit"
+          disabled={loading || !selectedFile}
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition disabled:opacity-50 cursor-pointer"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Création et liaison en cours...</span>
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              <span>Créer le dossier et lier la pièce jointe</span>
+            </>
+          )}
+        </button>
+      </div>
+    </form>
   );
 }

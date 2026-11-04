@@ -1,121 +1,217 @@
-import { useState } from "react";
-import { useLocation, useNavigate, Navigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react";
-import { useAuth } from "./context/AuthContext.jsx";
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from './context/AuthContext.jsx';
+import { getDashboardPath } from './api/roleRedirect.js';
 
-function LoginPage() {
-  const { login, isAuthenticated, loading } = useAuth();
+const LoginPage = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { login, isAuthenticated, loading, user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  // Redirection automatique si l'utilisateur est déjà connecté
+  useEffect(() => {
+    if (!loading && isAuthenticated && user) {
+      const destination = getDashboardPath(user);
 
-  const from = location.state?.from?.pathname || "/dashboard";
-
-  // Si déjà connecté, on ne montre pas la page de login.
-  if (!loading && isAuthenticated) {
-    return <Navigate to={from} replace />;
-  }
+      if (destination) {
+        navigate(destination, { replace: true });
+      } else {
+        // Rôle invalide : on informe l'utilisateur
+        setErrorMessage("Votre compte ne possède aucun rôle valide pour accéder à l'application.");
+      }
+    }
+  }, [isAuthenticated, loading, user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setErrorMessage('');
+    setIsSubmitting(true);
 
-    if (!email || !password) {
-      setError("Veuillez renseigner votre email et votre mot de passe.");
-      return;
-    }
-
-    setSubmitting(true);
     try {
-      await login(email, password);
-      navigate(from, { replace: true });
+      // Appel de la méthode login issue du AuthContext
+      const loggedInUser = await login(email, password);
+
+      // Calcul de la destination stricte
+      const destination = getDashboardPath(loggedInUser);
+
+      if (destination) {
+        // Redirection vers le dashboard dédié
+        navigate(destination, { replace: true });
+      } else {
+        // SÉCURITÉ : Rôle non défini ou inconnu
+        setErrorMessage("Accès refusé : Aucun rôle valide n'est attribué à votre compte.");
+        if (logout) await logout(); // Optionnel : déconnecte la session invalide
+      }
     } catch (err) {
-      setError(err.message || "Échec de la connexion. Veuillez réessayer.");
+      console.error('Erreur lors de la connexion:', err);
+      if (err.response && err.response.data) {
+        setErrorMessage(
+          err.response.data.detail ||
+          err.response.data.message ||
+          'Identifiants incorrects. Veuillez réessayer.'
+        );
+      } else {
+        setErrorMessage('Impossible de contacter le serveur. Vérifiez votre connexion.');
+      }
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-700 via-blue-600 to-blue-800 px-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-16 h-16 rounded-xl bg-blue-700 flex items-center justify-center mb-3">
-            <LogIn className="text-white w-8 h-8" />
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg border border-slate-200">
+        
+        {/* En-tête */}
+        <div className="text-center">
+          <div className="mx-auto h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-3">
+            <svg
+              className="h-6 w-6 text-blue-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
           </div>
-          <h1 className="text-xl font-bold text-gray-800">Gestion des Courriers</h1>
-          <p className="text-sm text-gray-500 mt-1">Connectez-vous à votre espace</p>
+          <h2 className="text-2xl font-bold text-slate-800">
+            Gestion de Courrier
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Connectez-vous à votre compte pour continuer
+          </p>
         </div>
 
-        {error && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2">
-            {error}
+        {/* Message d'erreur */}
+        {errorMessage && (
+          <div className="p-4 rounded-md bg-red-50 border border-red-200">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-5 w-5 text-red-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-red-800">
+                  {errorMessage}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        {/* Formulaire */}
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            
+            {/* Email */}
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-slate-700"
+              >
+                Adresse E-mail
+              </label>
               <input
                 id="email"
+                name="email"
                 type="email"
-                autoComplete="username"
+                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="vous@exemple.com"
-                className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition"
-                required
+                placeholder="nom@exemple.com"
+                className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               />
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Mot de passe
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            {/* Mot de passe */}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-slate-700"
+              >
+                Mot de passe
+              </label>
               <input
                 id="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
+                name="password"
+                type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-9 pr-9 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition"
-                required
+                className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg text-sm transition"
-          >
-            {submitting ? "Connexion en cours..." : "Se connecter"}
-          </button>
+          {/* Bouton de validation */}
+          <div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Connexion en cours...
+                </span>
+              ) : (
+                'Se connecter'
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>
   );
-}
+};
 
 export default LoginPage;
