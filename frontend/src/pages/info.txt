@@ -1,0 +1,8 @@
+Service ID:
+dpg-dbm1alm1egvs73b16rc0-a
+
+postgresql://db_courrier_user:MWK3pdoFJYJs23ubbNiaJPdi8NxKwV7d@dpg-dbm1alm1egvs73b16rc0-a/db_courrier
+
+
+
+key renderdjango-insecure-k!8z#9v2m$p7q%r4t6y8u1i3o5l0
